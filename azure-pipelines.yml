@@ -1,0 +1,63 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  branches:
+    include:
+      - main
+
+stages:
+- stage: DeployToDev
+  displayName: 'Deploy to Development'
+  jobs:
+  - job: deploy_dev
+    displayName: 'Deploy ADF to Dev'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    - task: AzureResourceManagerTemplateDeployment@3
+      inputs:
+        deploymentScope: 'Resource Group'
+        azureResourceManagerConnection: 'AzureServiceConnection'
+        subscriptionId: 'YOUR_SUBSCRIPTION_ID'
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: 'your-dev-rg'
+        location: 'East US'
+        templateLocation: 'Linked artifact'
+        csmFile: 'adf/ARMTemplateForFactory.json'
+        csmParametersFile: 'adf/ARMTemplateParametersForFactory.json'
+        overrideParameters: '-factoryName your-adf-dev-name'
+        deploymentMode: 'Incremental'
+
+- stage: DeployToProd
+  displayName: 'Deploy to Production'
+  dependsOn: DeployToDev
+  condition: succeeded()
+  approval:
+    approvals:
+      - name: 'Production Approval'
+        approvers:
+          - user@yourcompany.com
+  jobs:
+  - job: deploy_prod
+    displayName: 'Deploy ADF to Prod'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    - task: AzureResourceManagerTemplateDeployment@3
+      inputs:
+        deploymentScope: 'Resource Group'
+        azureResourceManagerConnection: 'AzureServiceConnection'
+        subscriptionId: 'YOUR_SUBSCRIPTION_ID'
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: 'your-prod-rg'
+        location: 'East US'
+        templateLocation: 'Linked artifact'
+        csmFile: 'adf/ARMTemplateForFactory.json'
+        csmParametersFile: 'adf/ARMTemplateParametersForFactory.json'
+        overrideParameters: '-factoryName your-adf-prod-name'
+        deploymentMode: 'Incremental'
